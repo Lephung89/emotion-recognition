@@ -7,17 +7,18 @@ import av
 import time
 from PIL import Image
 import os
+import gdown  # Thêm thư viện gdown
 
-# Tải mô hình
+# Tải mô hình từ Google Drive
 @st.cache_resource
-def load_emotion_model(model_path):
+def load_emotion_model():
+    model_path = "best_modelnew.h5.keras"
     if not os.path.exists(model_path):
-        st.error(f"File mô hình không tồn tại: {model_path}")
-        print(f"Model file not found: {model_path}")
-        return None
+        st.info("Đang tải mô hình từ Google Drive...")
+        gdown.download("https://drive.google.com/file/d/14l9QFI6PF480l4nh0SMNW8r5fM4BOchC/view?usp=drive_link", model_path, quiet=False)
     try:
         model = load_model(model_path)
-        st.success(f"Mô hình đã được tải thành công từ: {model_path}")
+        st.success(f"Mô hình đã được tải thành công!")
         print(f"Model loaded successfully from: {model_path}")
         return model
     except Exception as e:
@@ -126,7 +127,7 @@ class VideoProcessor(VideoProcessorBase):
                 x, y, w, h = best_face
                 avg_fps = np.mean(self.fps_array) if self.fps_array else 0
                 label = f'Cảm xúc: {best_emotion} ({best_confidence:.2f}), FPS: {avg_fps:.1f}'
-                cv2.rectangle(output_img, (x, y), (x+w, y+h), (0, 0, 255), 4)  # Tăng độ dày khung
+                cv2.rectangle(output_img, (x, y), (x+w, y+h), (0, 0, 255), 4)
                 text = f"{best_emotion}: {best_confidence:.2f}"
                 text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 1.2, 2)[0]
                 bg_y = max(0, y - 5)
@@ -147,17 +148,15 @@ def main():
     st.title("Nhận Diện Cảm Xúc Khuôn Mặt")
     st.write("Ứng dụng sử dụng InceptionV3 để nhận diện cảm xúc từ webcam hoặc hình ảnh tải lên.")
 
-    # Khởi tạo session state
     if 'label' not in st.session_state:
         st.session_state['label'] = 'Đang khởi tạo...'
     if 'image_result' not in st.session_state:
         st.session_state['image_result'] = None
 
     # Tải mô hình
-    model_path = r'D:\emotion_recognition\best_modelnew.h5.keras'
-    model = load_emotion_model(model_path)
+    model = load_emotion_model()
     if model is None:
-        st.error("Không thể tiếp tục do lỗi tải mô hình. Vui lòng kiểm tra đường dẫn và file mô hình.")
+        st.error("Không thể tiếp tục do lỗi tải mô hình. Vui lòng kiểm tra file mô hình trên Google Drive.")
         return
 
     # Phần tải hình ảnh
@@ -202,9 +201,9 @@ def main():
     )
     webrtc_streamer(
         key="emotion-recognition",
-        video_processor_factory=lambda: VideoProcessor(model),  # Truyền model vào VideoProcessor
+        video_processor_factory=lambda: VideoProcessor(model),
         rtc_configuration=RTC_CONFIGURATION,
-        media_stream_constraints={"video": {"width": 640, "height": 480, "frameRate": 10}, "audio": False},  # Phù hợp với webcam
+        media_stream_constraints={"video": {"width": 640, "height": 480, "frameRate": 10}, "audio": False},
         async_processing=True,
     )
     st.write(st.session_state['label'])
