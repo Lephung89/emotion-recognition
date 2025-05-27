@@ -15,7 +15,7 @@ def load_emotion_model():
     model_path = "best_modelnew.h5.keras"
     if not os.path.exists(model_path):
         st.info("Đang tải mô hình từ Google Drive...")
-        gdown.download("https://drive.google.com/file/d/14l9QFI6PF480l4nh0SMNW8r5fM4BOchC/view?usp=drive_link", model_path, quiet=False)
+        gdown.download("https://drive.google.com/file/d/1nB_Sr_jnm0HmMSC4ISf2bFOYPGLW15Bc/view?usp=sharing", model_path, quiet=False)
     try:
         model = load_model(model_path)
         st.success(f"Mô hình đã được tải thành công!")
