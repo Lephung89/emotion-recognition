@@ -23,9 +23,9 @@ GOOGLE_DRIVE_URL = "https://drive.google.com/uc?id=1nB_Sr_jnm0HmMSC4ISf2bFOYPGLW
 EMOTION_LABELS = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral']
 EMOTION_COLORS = {
     'angry': (0, 0, 255),      # Red
-    'disgust': (0, 255, 255),  # Yelllow
+    'disgust': (0, 128, 0),    # Green
     'fear': (128, 0, 128),     # Purple
-    'happy': (0, 128, 0),      # Green 
+    'happy': (0, 255, 255),    # Yellow
     'sad': (255, 0, 0),        # Blue
     'surprise': (255, 165, 0), # Orange
     'neutral': (128, 128, 128) # Gray
@@ -182,7 +182,7 @@ class ImageProcessor:
             return None, 0.0
 
 class OptimizedVideoProcessor(VideoProcessorBase):
-    """Video processor được tối ưu hóa"""
+    """Video processor được tối ưu hóa với xử lý no-face detection"""
     
     def __init__(self, model):
         self.model = model
@@ -195,14 +195,16 @@ class OptimizedVideoProcessor(VideoProcessorBase):
         self.fps_start_time = time.time()
         self.current_fps = 0
         
-        # Prediction caching
+        # Prediction caching và tracking
         self.last_prediction = None
         self.last_prediction_time = 0
-        self.prediction_interval = 0.3  # Giảm xuống để responsive hơn
+        self.prediction_interval = 0.3
+        self.no_face_start_time = None  # Thời điểm bắt đầu không có face
+        self.no_face_threshold = 1.0    # Sau 1 giây không có face thì clear prediction
         
         # Frame skipping for better performance
         self.frame_count = 0
-        self.process_every_n_frames = 3  # Xử lý mỗi 3 frame
+        self.process_every_n_frames = 3
         
         logger.info("VideoProcessor initialized successfully")
     
@@ -224,6 +226,7 @@ class OptimizedVideoProcessor(VideoProcessorBase):
             should_predict = (current_time - self.last_prediction_time) >= self.prediction_interval
             
             output_img = img.copy()
+            faces_detected = False
             
             if should_process:
                 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -233,59 +236,100 @@ class OptimizedVideoProcessor(VideoProcessorBase):
                     gray, 
                     scaleFactor=1.1, 
                     minNeighbors=3, 
-                    minSize=(60, 60),  # Tăng minSize để tránh false positive
+                    minSize=(60, 60),
                     flags=cv2.CASCADE_SCALE_IMAGE
                 )
                 
-                if len(faces) > 0 and should_predict:
-                    # Chọn khuôn mặt lớn nhất (gần camera nhất)
-                    largest_face = max(faces, key=lambda face: face[2] * face[3])
-                    x, y, w, h = largest_face
+                if len(faces) > 0:
+                    faces_detected = True
+                    self.no_face_start_time = None  # Reset no-face timer
                     
-                    # Mở rộng vùng face một chút
-                    margin = int(max(w, h) * 0.1)
-                    face_x = max(0, x - margin)
-                    face_y = max(0, y - margin)
-                    face_w = min(img.shape[1] - face_x, w + 2 * margin)
-                    face_h = min(img.shape[0] - face_y, h + 2 * margin)
-                    
-                    face_img = img[face_y:face_y+face_h, face_x:face_x+face_w]
-                    
-                    if face_img.size > 0:
-                        emotion, confidence = ImageProcessor.predict_emotion(face_img, self.model)
-                        if emotion is not None:
-                            self.last_prediction = (emotion, confidence, largest_face)
-                            self.last_prediction_time = current_time
+                    if should_predict:
+                        # Chọn khuôn mặt lớn nhất (gần camera nhất)
+                        largest_face = max(faces, key=lambda face: face[2] * face[3])
+                        x, y, w, h = largest_face
+                        
+                        # Mở rộng vùng face một chút
+                        margin = int(max(w, h) * 0.1)
+                        face_x = max(0, x - margin)
+                        face_y = max(0, y - margin)
+                        face_w = min(img.shape[1] - face_x, w + 2 * margin)
+                        face_h = min(img.shape[0] - face_y, h + 2 * margin)
+                        
+                        face_img = img[face_y:face_y+face_h, face_x:face_x+face_w]
+                        
+                        if face_img.size > 0:
+                            emotion, confidence = ImageProcessor.predict_emotion(face_img, self.model)
+                            if emotion is not None:
+                                self.last_prediction = (emotion, confidence, largest_face)
+                                self.last_prediction_time = current_time
+                else:
+                    # Không phát hiện được face
+                    if self.no_face_start_time is None:
+                        self.no_face_start_time = current_time
+                    elif (current_time - self.no_face_start_time) > self.no_face_threshold:
+                        # Đã quá lâu không có face, clear prediction
+                        self.last_prediction = None
             
             # Vẽ kết quả
-            label = f'FPS: {self.current_fps:.1f}'
-            if self.last_prediction is not None:
-                emotion, confidence, (x, y, w, h) = self.last_prediction
-                color = EMOTION_COLORS.get(emotion, (255, 255, 255))
-                
-                # Vẽ rectangle
-                cv2.rectangle(output_img, (x, y), (x+w, y+h), color, 3)
-                
-                # Vẽ text với background
-                text = f"{emotion}: {confidence:.2f}"
+            if faces_detected or (self.last_prediction is not None and 
+                                 self.no_face_start_time is None):
+                # Có face hiện tại hoặc vừa mới mất face (chưa quá threshold)
+                if self.last_prediction is not None:
+                    emotion, confidence, (x, y, w, h) = self.last_prediction
+                    color = EMOTION_COLORS.get(emotion, (255, 255, 255))
+                    
+                    # Vẽ rectangle
+                    cv2.rectangle(output_img, (x, y), (x+w, y+h), color, 3)
+                    
+                    # Vẽ text với background
+                    text = f"{emotion}: {confidence:.2f}"
+                    font = cv2.FONT_HERSHEY_SIMPLEX
+                    font_scale = 0.8
+                    thickness = 2
+                    
+                    (text_w, text_h), baseline = cv2.getTextSize(text, font, font_scale, thickness)
+                    
+                    # Background cho text
+                    bg_y = max(0, y - 10)
+                    cv2.rectangle(output_img, 
+                                (x, bg_y - text_h - baseline), 
+                                (x + text_w, bg_y), 
+                                color, -1)
+                    
+                    # Text
+                    cv2.putText(output_img, text, (x, bg_y - baseline), 
+                              font, font_scale, (255, 255, 255), thickness)
+                    
+                    label = f'{emotion}: {confidence:.2f} | FPS: {self.current_fps:.1f}'
+                else:
+                    label = f'FPS: {self.current_fps:.1f}'
+            else:
+                # Không có face được phát hiện
+                # Hiển thị thông báo "Không phát hiện khuôn mặt"
+                text = "Khong phat hien khuon mat"
                 font = cv2.FONT_HERSHEY_SIMPLEX
-                font_scale = 0.8
+                font_scale = 1.0
                 thickness = 2
+                color = (0, 0, 255)  # Màu đỏ
                 
+                # Tính toán vị trí để đặt text ở giữa màn hình
                 (text_w, text_h), baseline = cv2.getTextSize(text, font, font_scale, thickness)
+                img_h, img_w = output_img.shape[:2]
+                text_x = (img_w - text_w) // 2
+                text_y = (img_h + text_h) // 2
                 
                 # Background cho text
-                bg_y = max(0, y - 10)
                 cv2.rectangle(output_img, 
-                            (x, bg_y - text_h - baseline), 
-                            (x + text_w, bg_y), 
-                            color, -1)
+                            (text_x - 10, text_y - text_h - baseline - 10), 
+                            (text_x + text_w + 10, text_y + baseline + 10), 
+                            (0, 0, 0), -1)
                 
                 # Text
-                cv2.putText(output_img, text, (x, bg_y - baseline), 
-                          font, font_scale, (255, 255, 255), thickness)
+                cv2.putText(output_img, text, (text_x, text_y), 
+                          font, font_scale, color, thickness)
                 
-                label = f'{emotion}: {confidence:.2f} | FPS: {self.current_fps:.1f}'
+                label = f'Khong phat hien khuon mat | FPS: {self.current_fps:.1f}'
             
             # Update session state
             if 'label' in st.session_state:
@@ -498,7 +542,7 @@ def main():
     st.markdown("---")
     st.markdown(
         "<div style='text-align: center; color: gray;'>"
-        "🎭 Emotion Recognition App | Powered by Lê Phụng"
+        "🎭 Emotion Recognition App | Powered by InceptionV3 & Streamlit"
         "</div>", 
         unsafe_allow_html=True
     )
