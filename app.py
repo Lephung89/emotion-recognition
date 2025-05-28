@@ -221,55 +221,57 @@ class OptimizedVideoProcessor(VideoProcessorBase):
                 self.fps_counter = 0
                 self.fps_start_time = current_time
             
-            # Skip frames để tối ưu performance
-            should_process = (self.frame_count % self.process_every_n_frames == 0)
-            should_predict = (current_time - self.last_prediction_time) >= self.prediction_interval
-            
             output_img = img.copy()
-            faces_detected = False
             
-            if should_process:
-                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            # LUÔN LUÔN kiểm tra face detection để responsive hơn
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            
+            # Detect faces với parameters tối ưu
+            faces = self.face_cascade.detectMultiScale(
+                gray, 
+                scaleFactor=1.1, 
+                minNeighbors=3, 
+                minSize=(60, 60),
+                flags=cv2.CASCADE_SCALE_IMAGE
+            )
+            
+            faces_detected = len(faces) > 0
+            
+            if faces_detected:
+                # CÓ FACE - Reset no-face timer
+                self.no_face_start_time = None
                 
-                # Detect faces với parameters tối ưu
-                faces = self.face_cascade.detectMultiScale(
-                    gray, 
-                    scaleFactor=1.1, 
-                    minNeighbors=3, 
-                    minSize=(60, 60),
-                    flags=cv2.CASCADE_SCALE_IMAGE
-                )
+                # Chỉ predict emotion theo interval để tối ưu performance
+                should_process = (self.frame_count % self.process_every_n_frames == 0)
+                should_predict = (current_time - self.last_prediction_time) >= self.prediction_interval
                 
-                if len(faces) > 0:
-                    faces_detected = True
-                    self.no_face_start_time = None  # Reset no-face timer
+                if should_process and should_predict:
+                    # Chọn khuôn mặt lớn nhất (gần camera nhất)
+                    largest_face = max(faces, key=lambda face: face[2] * face[3])
+                    x, y, w, h = largest_face
                     
-                    if should_predict:
-                        # Chọn khuôn mặt lớn nhất (gần camera nhất)
-                        largest_face = max(faces, key=lambda face: face[2] * face[3])
-                        x, y, w, h = largest_face
-                        
-                        # Mở rộng vùng face một chút
-                        margin = int(max(w, h) * 0.1)
-                        face_x = max(0, x - margin)
-                        face_y = max(0, y - margin)
-                        face_w = min(img.shape[1] - face_x, w + 2 * margin)
-                        face_h = min(img.shape[0] - face_y, h + 2 * margin)
-                        
-                        face_img = img[face_y:face_y+face_h, face_x:face_x+face_w]
-                        
-                        if face_img.size > 0:
-                            emotion, confidence = ImageProcessor.predict_emotion(face_img, self.model)
-                            if emotion is not None:
-                                self.last_prediction = (emotion, confidence, largest_face)
-                                self.last_prediction_time = current_time
-                else:
-                    # Không phát hiện được face
-                    if self.no_face_start_time is None:
-                        self.no_face_start_time = current_time
-                    elif (current_time - self.no_face_start_time) > self.no_face_threshold:
-                        # Đã quá lâu không có face, clear prediction
-                        self.last_prediction = None
+                    # Mở rộng vùng face một chút
+                    margin = int(max(w, h) * 0.1)
+                    face_x = max(0, x - margin)
+                    face_y = max(0, y - margin)
+                    face_w = min(img.shape[1] - face_x, w + 2 * margin)
+                    face_h = min(img.shape[0] - face_y, h + 2 * margin)
+                    
+                    face_img = img[face_y:face_y+face_h, face_x:face_x+face_w]
+                    
+                    if face_img.size > 0:
+                        emotion, confidence = ImageProcessor.predict_emotion(face_img, self.model)
+                        if emotion is not None:
+                            self.last_prediction = (emotion, confidence, largest_face)
+                            self.last_prediction_time = current_time
+            else:
+                # KHÔNG CÓ FACE
+                if self.no_face_start_time is None:
+                    # Bắt đầu đếm thời gian không có face
+                    self.no_face_start_time = current_time
+                elif (current_time - self.no_face_start_time) > self.no_face_threshold:
+                    # Đã quá lâu không có face, XÓA prediction cũ
+                    self.last_prediction = None
             
             # Vẽ kết quả
             if faces_detected or (self.last_prediction is not None and 
@@ -542,7 +544,7 @@ def main():
     st.markdown("---")
     st.markdown(
         "<div style='text-align: center; color: gray;'>"
-        "🎭 Emotion Recognition App | Powered by Lê Phụng"
+        "🎭 Emotion Recognition App | Powered by InceptionV3 & Streamlit"
         "</div>", 
         unsafe_allow_html=True
     )
