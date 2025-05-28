@@ -429,7 +429,7 @@ def main():
     with st.sidebar:
         st.header("ℹ️ Thông tin ứng dụng")
         st.info("""
-        **Mô hình:** InceptionV3
+        **Mô hình:**
         **Cảm xúc nhận diện:** 
         - 😠 Angry (Tức giận)
         - 🤢 Disgust (Ghê tởm)  
