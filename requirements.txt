@@ -1,5 +1,5 @@
 streamlit==1.45.1
-streamlit-webrtc==0.47.7
+streamlit-webrtc==0.62.4
 opencv-python-headless==4.10.0.84
 numpy==1.26.4
 pillow==10.4.0
