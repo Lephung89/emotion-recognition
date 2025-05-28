@@ -18,8 +18,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
-MODEL_PATH = "best_model1.h5.keras"
-GOOGLE_DRIVE_URL = "https://drive.google.com/file/d/1zv4QRkSa8gKx4U3b5Ox0uL0ilUMFk1b8/view?usp=sharing"
+MODEL_PATH = "best_modelnew.h5.keras"
+GOOGLE_DRIVE_URL = "https://drive.google.com/file/d/1nB_Sr_jnm0HmMSC4ISf2bFOYPGLW15Bc/view?usp=drive_link"
 EMOTION_LABELS = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral']
 EMOTION_COLORS = {
     'angry': (0, 0, 255),      # Red
