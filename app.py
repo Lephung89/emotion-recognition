@@ -239,7 +239,7 @@ def main():
         key="emotion-recognition",
         video_processor_factory=lambda: VideoProcessor(model),
         rtc_configuration=RTC_CONFIGURATION,
-        media_stream_constraints={"video": {"width": 640, "height": 480, "frameRate": 5}, "audio": False},
+        media_stream_constraints={"video": {"width": 320, "height": 240, "frameRate": 5}, "audio": False},
         async_processing=True,
     )
     st.write(st.session_state['label'])
