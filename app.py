@@ -542,7 +542,7 @@ def main():
     st.markdown("---")
     st.markdown(
         "<div style='text-align: center; color: gray;'>"
-        "🎭 Emotion Recognition App | Powered by InceptionV3 & Streamlit"
+        "🎭 Emotion Recognition App | Powered by Lê Phụng"
         "</div>", 
         unsafe_allow_html=True
     )
