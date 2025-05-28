@@ -35,7 +35,6 @@ def load_emotion_model():
         uploaded_model = st.file_uploader("Vui lòng chọn file mô hình (.h5 hoặc .keras)", type=["h5", "keras"])
         if uploaded_model is not None:
             try:
-                # Lưu file tạm thời
                 with open(model_path, "wb") as f:
                     f.write(uploaded_model.getbuffer())
                 st.success("File mô hình đã được tải lên thành công!")
@@ -230,7 +229,11 @@ def main():
     # Phần webcam
     st.subheader("Nhận diện cảm xúc từ webcam")
     RTC_CONFIGURATION = RTCConfiguration(
-        {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
+        {"iceServers": [
+            {"urls": ["stun:stun.l.google.com:19302"]},
+            {"urls": ["stun:stun1.l.google.com:19302"]},
+            {"urls": ["stun:stun2.l.google.com:19302"]}
+        ]}
     )
     webrtc_streamer(
         key="emotion-recognition",
