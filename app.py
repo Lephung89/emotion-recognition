@@ -19,13 +19,13 @@ logger = logging.getLogger(__name__)
 
 # Constants
 MODEL_PATH = "best_modelnew.h5.keras"
-GOOGLE_DRIVE_URL = "https://drive.google.com/file/d/1nB_Sr_jnm0HmMSC4ISf2bFOYPGLW15Bc/view?usp=drive_link"
+GOOGLE_DRIVE_URL = "https://drive.google.com/uc?id=1nB_Sr_jnm0HmMSC4ISf2bFOYPGLW15Bc"
 EMOTION_LABELS = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral']
 EMOTION_COLORS = {
     'angry': (0, 0, 255),      # Red
-    'disgust':(0, 255, 255),    # Yellow
+    'disgust': (0, 128, 0),    # Green
     'fear': (128, 0, 128),     # Purple
-    'happy': (0, 128, 0),    # Green
+    'happy': (0, 255, 255),    # Yellow
     'sad': (255, 0, 0),        # Blue
     'surprise': (255, 165, 0), # Orange
     'neutral': (128, 128, 128) # Gray
@@ -36,20 +36,29 @@ class ModelManager:
     
     @staticmethod
     @st.cache_resource
-    def load_emotion_model():
-        """Tải mô hình với error handling tốt hơn"""
+    def load_emotion_model_from_file(model_path: str):
+        """Tải mô hình từ file path cụ thể"""
+        try:
+            model = load_model(model_path, compile=False)
+            logger.info(f"Model loaded successfully from: {model_path}")
+            return model
+        except Exception as e:
+            logger.error(f"Model loading error: {e}")
+            raise e
+    
+    @staticmethod
+    def check_and_load_model():
+        """Kiểm tra và tải mô hình với các phương thức khác nhau"""
         model_path = Path(MODEL_PATH)
         
         # Kiểm tra file tồn tại và tải trực tiếp
         if model_path.exists():
             try:
-                model = load_model(str(model_path), compile=False)
+                model = ModelManager.load_emotion_model_from_file(str(model_path))
                 st.success(f"✅ Mô hình đã được tải thành công từ: {model_path}")
-                logger.info(f"Model loaded successfully from: {model_path}")
                 return model
             except Exception as e:
                 st.error(f"❌ Lỗi khi tải mô hình từ file có sẵn: {e}")
-                logger.error(f"Model loading error: {e}")
                 # Xóa file lỗi
                 try:
                     model_path.unlink()
@@ -62,42 +71,54 @@ class ModelManager:
     @staticmethod
     def _download_from_drive():
         """Tải mô hình từ Google Drive"""
-        with st.spinner("🔄 Đang tải mô hình từ Google Drive..."):
-            try:
+        try:
+            with st.spinner("🔄 Đang tải mô hình từ Google Drive..."):
                 gdown.download(GOOGLE_DRIVE_URL, MODEL_PATH, quiet=False)
-                if Path(MODEL_PATH).exists():
-                    model = load_model(MODEL_PATH, compile=False)
-                    st.success("✅ Tải mô hình từ Google Drive thành công!")
-                    return model
-                else:
-                    raise FileNotFoundError("Không thể tải file từ Google Drive.")
-            except Exception as e:
-                st.error(f"❌ Lỗi khi tải từ Google Drive: {e}")
-                return ModelManager._manual_upload()
+                
+            if Path(MODEL_PATH).exists():
+                model = ModelManager.load_emotion_model_from_file(MODEL_PATH)
+                st.success("✅ Tải mô hình từ Google Drive thành công!")
+                return model
+            else:
+                raise FileNotFoundError("Không thể tải file từ Google Drive.")
+                
+        except Exception as e:
+            st.error(f"❌ Lỗi khi tải từ Google Drive: {e}")
+            st.info("💡 Bạn có thể thử các cách sau:")
+            st.markdown("""
+            1. **Kiểm tra kết nối internet**
+            2. **Đảm bảo Google Drive link hợp lệ**
+            3. **Tải file mô hình thủ công ở phần dưới**
+            """)
+            return None
     
     @staticmethod
-    def _manual_upload():
-        """Cho phép tải mô hình thủ công"""
-        st.subheader("📤 Tải mô hình thủ công")
-        st.info("Vui lòng tải file mô hình (.h5 hoặc .keras) để tiếp tục.")
-        
-        uploaded_model = st.file_uploader(
-            "Chọn file mô hình", 
-            type=["h5", "keras"],
-            help="File mô hình phải có định dạng .h5 hoặc .keras"
-        )
-        
+    def handle_manual_upload(uploaded_model):
+        """Xử lý tải mô hình thủ công"""
         if uploaded_model is not None:
             try:
-                with open(MODEL_PATH, "wb") as f:
+                # Lưu file tạm thời
+                temp_path = f"temp_{MODEL_PATH}"
+                with open(temp_path, "wb") as f:
                     f.write(uploaded_model.getbuffer())
                 
-                model = load_model(MODEL_PATH, compile=False)
+                # Thử tải mô hình
+                model = ModelManager.load_emotion_model_from_file(temp_path)
+                
+                # Nếu thành công, chuyển sang tên chính thức
+                if Path(MODEL_PATH).exists():
+                    Path(MODEL_PATH).unlink()
+                Path(temp_path).rename(MODEL_PATH)
+                
                 st.success("✅ File mô hình đã được tải lên và khởi tạo thành công!")
-                st.rerun()  # Refresh app
+                st.balloons()
                 return model
+                
             except Exception as e:
-                st.error(f"❌ Lỗi khi lưu/tải file mô hình: {e}")
+                st.error(f"❌ Lỗi khi xử lý file mô hình: {e}")
+                # Xóa file tạm nếu lỗi
+                if Path(f"temp_{MODEL_PATH}").exists():
+                    Path(f"temp_{MODEL_PATH}").unlink()
                 return None
         
         return None
@@ -374,16 +395,46 @@ def main():
         """)
         
         st.header("⚙️ Cài đặt")
-        st.write("Ứng dụng tự động tối ưu hiệu suất")
+        if st.button("🔄 Tải lại mô hình", help="Xóa cache và tải lại mô hình"):
+            st.cache_resource.clear()
+            st.rerun()
+        
+        # Hiển thị trạng thái model
+        if Path(MODEL_PATH).exists():
+            st.success("✅ Mô hình có sẵn")
+        else:
+            st.warning("⚠️ Chưa có mô hình")
     
     # Khởi tạo session state
     if 'label' not in st.session_state:
         st.session_state['label'] = '🔄 Đang khởi tạo...'
+    if 'model_loaded' not in st.session_state:
+        st.session_state['model_loaded'] = False
     
     # Tải mô hình
-    model = ModelManager.load_emotion_model()
+    model = ModelManager.check_and_load_model()
+    
+    # Nếu không có model, hiển thị phần upload
     if model is None:
-        st.error("❌ Không thể tiếp tục do lỗi tải mô hình.")
+        st.subheader("📤 Tải mô hình thủ công")
+        st.info("Vui lòng tải file mô hình (.h5 hoặc .keras) để tiếp tục.")
+        
+        uploaded_model = st.file_uploader(
+            "Chọn file mô hình", 
+            type=["h5", "keras"],
+            help="File mô hình phải có định dạng .h5 hoặc .keras",
+            key="model_uploader"
+        )
+        
+        if uploaded_model is not None:
+            with st.spinner("🔄 Đang xử lý file mô hình..."):
+                model = ModelManager.handle_manual_upload(uploaded_model)
+                if model is not None:
+                    st.session_state['model_loaded'] = True
+                    st.rerun()
+    
+    if model is None:
+        st.error("❌ Không thể tiếp tục do chưa có mô hình. Vui lòng tải mô hình ở trên.")
         st.stop()
     
     # Tabs cho các chức năng
@@ -396,7 +447,8 @@ def main():
         uploaded_file = st.file_uploader(
             "Chọn hình ảnh", 
             type=["jpg", "jpeg", "png"],
-            help="Hình ảnh nên chứa khuôn mặt rõ ràng để có kết quả tốt nhất"
+            help="Hình ảnh nên chứa khuôn mặt rõ ràng để có kết quả tốt nhất",
+            key="image_uploader"
         )
         
         if uploaded_file is not None:
@@ -446,7 +498,7 @@ def main():
     st.markdown("---")
     st.markdown(
         "<div style='text-align: center; color: gray;'>"
-        "🎭 Emotion Recognition App | Powered by Lê Phụng"
+        "🎭 Emotion Recognition App | Powered by InceptionV3 & Streamlit"
         "</div>", 
         unsafe_allow_html=True
     )
