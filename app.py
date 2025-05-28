@@ -309,7 +309,7 @@ class OptimizedVideoProcessor(VideoProcessorBase):
             else:
                 # Không có face được phát hiện
                 # Hiển thị thông báo "Không phát hiện khuôn mặt"
-                text = "Không phát hiện khuôn mặt"
+                text = "no face detected"
                 font = cv2.FONT_HERSHEY_SIMPLEX
                 font_scale = 1.0
                 thickness = 2
