@@ -23,9 +23,9 @@ GOOGLE_DRIVE_URL = "https://drive.google.com/uc?id=1nB_Sr_jnm0HmMSC4ISf2bFOYPGLW
 EMOTION_LABELS = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral']
 EMOTION_COLORS = {
     'angry': (0, 0, 255),      # Red
-    'disgust': (0, 128, 0),    # Green
+    'disgust': (0, 255, 255),  # Yellow
     'fear': (128, 0, 128),     # Purple
-    'happy': (0, 255, 255),    # Yellow
+    'happy': (0, 128, 0),      # Green
     'sad': (255, 0, 0),        # Blue
     'surprise': (255, 165, 0), # Orange
     'neutral': (128, 128, 128) # Gray
@@ -309,7 +309,7 @@ class OptimizedVideoProcessor(VideoProcessorBase):
             else:
                 # Không có face được phát hiện
                 # Hiển thị thông báo "Không phát hiện khuôn mặt"
-                text = "Khong phat hien khuon mat"
+                text = "Không phát hiện khuôn mặt"
                 font = cv2.FONT_HERSHEY_SIMPLEX
                 font_scale = 1.0
                 thickness = 2
