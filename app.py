@@ -7,24 +7,57 @@ import av
 import time
 from PIL import Image
 import os
-import gdown  # Thêm thư viện gdown
+import gdown
+import shutil
 
-# Tải mô hình từ Google Drive
+# Tải mô hình từ Google Drive hoặc cho phép tải thủ công
 @st.cache_resource
 def load_emotion_model():
     model_path = "best_modelnew.h5.keras"
+    model = None
+
+    # Thử tải từ Google Drive
     if not os.path.exists(model_path):
         st.info("Đang tải mô hình từ Google Drive...")
-        gdown.download("https://drive.google.com/file/d/1nB_Sr_jnm0HmMSC4ISf2bFOYPGLW15Bc/view?usp=sharing", model_path, quiet=False)
-    try:
-        model = load_model(model_path)
-        st.success(f"Mô hình đã được tải thành công!")
-        print(f"Model loaded successfully from: {model_path}")
-        return model
-    except Exception as e:
-        st.error(f"Lỗi khi tải mô hình: {e}")
-        print(f"Model loading error: {e}")
-        return None
+        try:
+            gdown.download("https://drive.google.com/uc?id=1nB_Sr_jnm0HmMSC4ISf2bFOYPGLW15Bc", model_path, quiet=False)
+            if os.path.exists(model_path):
+                st.success("Tải mô hình từ Google Drive thành công!")
+            else:
+                raise FileNotFoundError("Không thể tải file từ Google Drive.")
+        except Exception as e:
+            st.error(f"Lỗi khi tải từ Google Drive: {e}")
+            st.warning("Không tải được mô hình từ Google Drive. Vui lòng tải thủ công.")
+
+    # Nếu không tải được từ Google Drive, cho phép tải thủ công
+    if not os.path.exists(model_path):
+        st.subheader("Tải mô hình thủ công")
+        uploaded_model = st.file_uploader("Vui lòng chọn file mô hình (.h5 hoặc .keras)", type=["h5", "keras"])
+        if uploaded_model is not None:
+            try:
+                # Lưu file tạm thời
+                with open(model_path, "wb") as f:
+                    f.write(uploaded_model.getbuffer())
+                st.success("File mô hình đã được tải lên thành công!")
+            except Exception as e:
+                st.error(f"Lỗi khi lưu file mô hình: {e}")
+                return None
+
+    # Tải mô hình từ file
+    if os.path.exists(model_path):
+        try:
+            model = load_model(model_path, compile=False)
+            st.success(f"Mô hình đã được tải thành công từ: {model_path}")
+            print(f"Model loaded successfully from: {model_path}")
+            return model
+        except Exception as e:
+            st.error(f"Lỗi khi tải mô hình: {e}")
+            print(f"Model loading error: {e}")
+            if os.path.exists(model_path):
+                os.remove(model_path)  # Xóa file lỗi
+            return None
+    st.error("Không thể tải mô hình. Vui lòng kiểm tra file hoặc thử lại.")
+    return None
 
 # Tiền xử lý ảnh khuôn mặt
 def preprocess_face(face_img):
@@ -81,7 +114,7 @@ class VideoProcessor(VideoProcessorBase):
         self.fps_array = []
         self.prev_frame_time = 0
         self.last_prediction_time = 0
-        self.prediction_interval = 0.5  # Dự đoán mỗi 0.5 giây
+        self.prediction_interval = 0.5
 
     def recv(self, frame):
         try:
@@ -156,7 +189,7 @@ def main():
     # Tải mô hình
     model = load_emotion_model()
     if model is None:
-        st.error("Không thể tiếp tục do lỗi tải mô hình. Vui lòng kiểm tra file mô hình trên Google Drive.")
+        st.error("Không thể tiếp tục do lỗi tải mô hình. Vui lòng kiểm tra file hoặc tải thủ công.")
         return
 
     # Phần tải hình ảnh
@@ -203,7 +236,7 @@ def main():
         key="emotion-recognition",
         video_processor_factory=lambda: VideoProcessor(model),
         rtc_configuration=RTC_CONFIGURATION,
-        media_stream_constraints={"video": {"width": 640, "height": 480, "frameRate": 10}, "audio": False},
+        media_stream_constraints={"video": {"width": 640, "height": 480, "frameRate": 5}, "audio": False},
         async_processing=True,
     )
     st.write(st.session_state['label'])
