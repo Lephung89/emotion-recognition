@@ -9,13 +9,14 @@ from PIL import Image
 import os
 import gdown
 import shutil
-import asyncio
 
 # Tải mô hình từ Google Drive hoặc cho phép tải thủ công
 @st.cache_resource
 def load_emotion_model():
     model_path = "best_modelnew.h5.keras"
     model = None
+
+    # Thử tải từ Google Drive
     if not os.path.exists(model_path):
         st.info("Đang tải mô hình từ Google Drive...")
         try:
@@ -27,6 +28,8 @@ def load_emotion_model():
         except Exception as e:
             st.error(f"Lỗi khi tải từ Google Drive: {e}")
             st.warning("Không tải được mô hình từ Google Drive. Vui lòng tải thủ công.")
+
+    # Nếu không tải được từ Google Drive, cho phép tải thủ công
     if not os.path.exists(model_path):
         st.subheader("Tải mô hình thủ công")
         uploaded_model = st.file_uploader("Vui lòng chọn file mô hình (.h5 hoặc .keras)", type=["h5", "keras"])
@@ -38,6 +41,8 @@ def load_emotion_model():
             except Exception as e:
                 st.error(f"Lỗi khi lưu file mô hình: {e}")
                 return None
+
+    # Tải mô hình từ file
     if os.path.exists(model_path):
         try:
             model = load_model(model_path, compile=False)
@@ -48,12 +53,35 @@ def load_emotion_model():
             st.error(f"Lỗi khi tải mô hình: {e}")
             print(f"Model loading error: {e}")
             if os.path.exists(model_path):
-                os.remove(model_path)
+                os.remove(model_path)  # Xóa file lỗi
             return None
     st.error("Không thể tải mô hình. Vui lòng kiểm tra file hoặc thử lại.")
     return None
 
-async def predict_emotion_async(face_img, model):
+# Tiền xử lý ảnh khuôn mặt
+def preprocess_face(face_img):
+    try:
+        print("Preprocessing face image with shape:", face_img.shape)
+        face_img = cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB)
+        lab = cv2.cvtColor(face_img, cv2.COLOR_RGB2LAB)
+        l, a, b = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        l = clahe.apply(l)
+        lab = cv2.merge((l,a,b))
+        face_img = cv2.cvtColor(lab, cv2.COLOR_LAB2RGB)
+        face_img = cv2.resize(face_img, (299, 299))
+        face_img = face_img.astype('float32')
+        face_img = (face_img - 127.5) / 127.5
+        face_img = np.expand_dims(face_img, axis=0)
+        print("Preprocessed image shape:", face_img.shape)
+        return face_img
+    except Exception as e:
+        st.error(f"Lỗi trong tiền xử lý: {e}")
+        print(f"Preprocessing error: {e}")
+        return None
+
+# Dự đoán cảm xúc
+def predict_emotion(face_img, model):
     try:
         if model is None:
             print("Model is None, cannot predict")
@@ -63,8 +91,7 @@ async def predict_emotion_async(face_img, model):
             print("Preprocessing failed")
             return None, 0.0
         print("Predicting with processed image shape:", processed_img.shape)
-        loop = asyncio.get_event_loop()
-        predictions = await loop.run_in_executor(None, lambda: model.predict(processed_img, verbose=0))
+        predictions = model.predict(processed_img, verbose=0)
         print("Raw predictions:", predictions)
         emotion_labels = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral']
         predicted_class = np.argmax(predictions[0])
@@ -76,21 +103,7 @@ async def predict_emotion_async(face_img, model):
         print(f"Prediction error: {e}")
         return None, 0.0
 
-def preprocess_face(face_img):
-    try:
-        print("Preprocessing face image with shape:", face_img.shape)
-        face_img = cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB)
-        face_img = cv2.resize(face_img, (224, 224))
-        face_img = face_img.astype('float32')
-        face_img = (face_img - 127.5) / 127.5
-        face_img = np.expand_dims(face_img, axis=0)
-        print("Preprocessed image shape:", face_img.shape)
-        return face_img
-    except Exception as e:
-        st.error(f"Lỗi trong tiền xử lý: {e}")
-        print(f"Preprocessing error: {e}")
-        return None
-
+# Class xử lý video
 class VideoProcessor(VideoProcessorBase):
     def __init__(self, model):
         self.model = model
@@ -100,9 +113,9 @@ class VideoProcessor(VideoProcessorBase):
         self.fps_array = []
         self.prev_frame_time = 0
         self.last_prediction_time = 0
-        self.prediction_interval = 0.2
+        self.prediction_interval = 0.5
 
-    async def recv(self, frame):
+    def recv(self, frame):
         try:
             img = frame.to_ndarray(format="bgr24")
             print("Frame shape:", img.shape)
@@ -130,7 +143,7 @@ class VideoProcessor(VideoProcessorBase):
                     face_h = min(img.shape[0] - face_y, h + y_offset * 2)
                     face_img = img[face_y:face_y+face_h, x:x+w]
                     try:
-                        emotion, confidence = await predict_emotion_async(face_img, self.model)
+                        emotion, confidence = predict_emotion(face_img, self.model)
                         if emotion is not None and confidence > best_confidence:
                             best_emotion = emotion
                             best_confidence = confidence
@@ -162,6 +175,7 @@ class VideoProcessor(VideoProcessorBase):
             print(f"Video processing error: {e}")
             return frame
 
+# Ứng dụng Streamlit
 def main():
     st.title("Nhận Diện Cảm Xúc Khuôn Mặt")
     st.write("Ứng dụng sử dụng InceptionV3 để nhận diện cảm xúc từ webcam hoặc hình ảnh tải lên.")
@@ -171,11 +185,13 @@ def main():
     if 'image_result' not in st.session_state:
         st.session_state['image_result'] = None
 
+    # Tải mô hình
     model = load_emotion_model()
     if model is None:
         st.error("Không thể tiếp tục do lỗi tải mô hình. Vui lòng kiểm tra file hoặc tải thủ công.")
         return
 
+    # Phần tải hình ảnh
     st.subheader("Tải hình ảnh để dự đoán cảm xúc")
     uploaded_file = st.file_uploader("Chọn một hình ảnh chứa khuôn mặt", type=["jpg", "jpeg", "png"])
     if uploaded_file is not None:
@@ -210,6 +226,7 @@ def main():
     if st.session_state['image_result']:
         st.write(st.session_state['image_result'])
 
+    # Phần webcam
     st.subheader("Nhận diện cảm xúc từ webcam")
     RTC_CONFIGURATION = RTCConfiguration(
         {"iceServers": [
@@ -222,7 +239,7 @@ def main():
         key="emotion-recognition",
         video_processor_factory=lambda: VideoProcessor(model),
         rtc_configuration=RTC_CONFIGURATION,
-        media_stream_constraints={"video": {"width": 640, "height": 480, "frameRate": 15}, "audio": False},
+        media_stream_constraints={"video": {"width": 640, "height": 480, "frameRate": 5}, "audio": False},
         async_processing=True,
     )
     st.write(st.session_state['label'])
