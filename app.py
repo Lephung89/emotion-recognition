@@ -344,41 +344,46 @@ class OptimizedVideoProcessor(VideoProcessorBase):
             return frame
 
 def get_webrtc_configuration():
-    """Lấy cấu hình WebRTC tối ưu cho nhiều loại mạng"""
+    """Cấu hình WebRTC tối ưu để khắc phục lỗi connection"""
     
-    # Nhiều STUN/TURN servers để tăng khả năng kết nối
+    # Cấu hình STUN servers mạnh mẽ hơn
     ice_servers = [
-        # Google STUN servers
-        {"urls": ["stun:stun.l.google.com:19302"]},
-        {"urls": ["stun:stun1.l.google.com:19302"]},
-        {"urls": ["stun:stun2.l.google.com:19302"]},
-        {"urls": ["stun:stun3.l.google.com:19302"]},
-        {"urls": ["stun:stun4.l.google.com:19302"]},
+        # Google STUN servers - Ổn định nhất
+        {"urls": "stun:stun.l.google.com:19302"},
+        {"urls": "stun:stun1.l.google.com:19302"},
+        {"urls": "stun:stun2.l.google.com:19302"},
         
-        # Mozilla STUN server
-        {"urls": ["stun:stun.mozilla.org"]},
+        # OpenRelay TURN servers - Free và ổn định
+        {
+            "urls": "turn:openrelay.metered.ca:80",
+            "username": "openrelayproject",
+            "credential": "openrelayproject"
+        },
+        {
+            "urls": "turn:openrelay.metered.ca:443",
+            "username": "openrelayproject", 
+            "credential": "openrelayproject"
+        },
+        {
+            "urls": "turn:openrelay.metered.ca:443?transport=tcp",
+            "username": "openrelayproject",
+            "credential": "openrelayproject"
+        },
         
-        # Alternate STUN servers
-        {"urls": ["stun:stun.stunprotocol.org:3478"]},
-        {"urls": ["stun:stun.ekiga.net"]},
-        
-        # Free TURN servers (có thể không ổn định nhưng giúp với firewall nghiêm ngặt)
-        # Uncomment nếu cần TURN server
-        # {
-        #     "urls": ["turn:numb.viagenie.ca"],
-        #     "credential": "muazkh",
-        #     "username": "webrtc@live.com"
-        # },
+        # Backup STUN servers
+        {"urls": "stun:stun.stunprotocol.org:3478"},
+        {"urls": "stun:stun.mozilla.org"},
     ]
     
     return RTCConfiguration({
         "iceServers": ice_servers,
-        "iceTransportPolicy": "all",  # Cho phép cả relay và host candidates
-        "bundlePolicy": "balanced",
-        "rtcpMuxPolicy": "require",
-        "iceCandidatePoolSize": 10,  # Tăng số lượng ICE candidates
+        "iceTransportPolicy": "all",
+        "bundlePolicy": "max-bundle",
+        "rtcpMuxPolicy": "require", 
+        "iceCandidatePoolSize": 10,
+        "iceConnectionReceiveTimeout": 30000,  # 30 seconds
+        "iceGatheringTimeout": 10000,         # 10 seconds
     })
-
 def process_uploaded_image(uploaded_file, model):
     """Xử lý hình ảnh được tải lên"""
     try:
