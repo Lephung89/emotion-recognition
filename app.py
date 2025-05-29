@@ -343,6 +343,42 @@ class OptimizedVideoProcessor(VideoProcessorBase):
             logger.error(f"Video processing error: {e}")
             return frame
 
+def get_webrtc_configuration():
+    """Lấy cấu hình WebRTC tối ưu cho nhiều loại mạng"""
+    
+    # Nhiều STUN/TURN servers để tăng khả năng kết nối
+    ice_servers = [
+        # Google STUN servers
+        {"urls": ["stun:stun.l.google.com:19302"]},
+        {"urls": ["stun:stun1.l.google.com:19302"]},
+        {"urls": ["stun:stun2.l.google.com:19302"]},
+        {"urls": ["stun:stun3.l.google.com:19302"]},
+        {"urls": ["stun:stun4.l.google.com:19302"]},
+        
+        # Mozilla STUN server
+        {"urls": ["stun:stun.mozilla.org"]},
+        
+        # Alternate STUN servers
+        {"urls": ["stun:stun.stunprotocol.org:3478"]},
+        {"urls": ["stun:stun.ekiga.net"]},
+        
+        # Free TURN servers (có thể không ổn định nhưng giúp với firewall nghiêm ngặt)
+        # Uncomment nếu cần TURN server
+        # {
+        #     "urls": ["turn:numb.viagenie.ca"],
+        #     "credential": "muazkh",
+        #     "username": "webrtc@live.com"
+        # },
+    ]
+    
+    return RTCConfiguration({
+        "iceServers": ice_servers,
+        "iceTransportPolicy": "all",  # Cho phép cả relay và host candidates
+        "bundlePolicy": "balanced",
+        "rtcpMuxPolicy": "require",
+        "iceCandidatePoolSize": 10,  # Tăng số lượng ICE candidates
+    })
+
 def process_uploaded_image(uploaded_file, model):
     """Xử lý hình ảnh được tải lên"""
     try:
@@ -445,6 +481,35 @@ def main():
             st.cache_resource.clear()
             st.rerun()
         
+        # Cài đặt WebRTC
+        st.header("📡 Cài đặt Camera")
+        video_quality = st.selectbox(
+            "Chất lượng video",
+            ["Thấp (320x240)", "Trung bình (640x480)", "Cao (1280x720)"],
+            index=1,
+            help="Chất lượng thấp hơn giúp kết nối ổn định hơn trên mạng chậm"
+        )
+        
+        frame_rate = st.slider(
+            "Tốc độ khung hình (FPS)",
+            min_value=5,
+            max_value=30,
+            value=15,
+            help="FPS thấp hơn giúp kết nối ổn định hơn"
+        )
+        
+        # Network troubleshooting
+        st.header("🔧 Khắc phục sự cố")
+        if st.button("🔍 Kiểm tra kết nối"):
+            st.info("""
+            **Nếu gặp lỗi kết nối:**
+            1. Thử chuyển sang chất lượng video thấp hơn
+            2. Giảm FPS xuống 10-15
+            3. Kiểm tra tường lửa của công ty/trường học
+            4. Thử dùng VPN nếu mạng bị hạn chế
+            5. Restart browser và clear cache
+            """)
+        
         # Hiển thị trạng thái model
         if Path(MODEL_PATH).exists():
             st.success("✅ Mô hình có sẵn")
@@ -504,25 +569,40 @@ def main():
         st.subheader("🎥 Nhận diện cảm xúc từ camera")
         st.write("Cho phép truy cập camera và bắt đầu nhận diện")
         
-        # Cấu hình WebRTC
-        RTC_CONFIGURATION = RTCConfiguration({
-            "iceServers": [
-                {"urls": ["stun:stun.l.google.com:19302"]},
-                {"urls": ["stun:stun1.l.google.com:19302"]},
-            ]
-        })
+        # Cấu hình video dựa trên lựa chọn người dùng
+        if video_quality == "Thấp (320x240)":
+            video_constraints = {
+                "width": {"ideal": 320},
+                "height": {"ideal": 240},
+            }
+        elif video_quality == "Trung bình (640x480)":
+            video_constraints = {
+                "width": {"ideal": 640},
+                "height": {"ideal": 480},
+            }
+        else:  # Cao
+            video_constraints = {
+                "width": {"ideal": 1280},
+                "height": {"ideal": 720},
+            }
         
-        # WebRTC Streamer
+        video_constraints["frameRate"] = {"ideal": frame_rate, "max": 30}
+        
+        # Cảnh báo về mạng
+        st.warning("""
+        ⚠️ **Lưu ý về kết nối:**
+        - Nếu gặp lỗi "connection taking longer", hãy thử giảm chất lượng video
+        - Một số mạng công ty/trường học có thể chặn WebRTC
+        - Mạng 4G đôi khi không ổn định với WebRTC
+        """)
+        
+        # WebRTC Streamer với cấu hình cải thiện
         webrtc_ctx = webrtc_streamer(
-            key="emotion-recognition",
+            key="emotion-recognition-improved",
             video_processor_factory=lambda: OptimizedVideoProcessor(model),
-            rtc_configuration=RTC_CONFIGURATION,
+            rtc_configuration=get_webrtc_configuration(),
             media_stream_constraints={
-                "video": {
-                    "width": {"ideal": 640},
-                    "height": {"ideal": 480},
-                    "frameRate": {"ideal": 15, "max": 30}
-                }, 
+                "video": video_constraints,
                 "audio": False
             },
             async_processing=True,
@@ -539,12 +619,42 @@ def main():
         else:
             with status_placeholder.container():
                 st.warning("⚠️ Camera chưa được kích hoạt. Nhấn 'Start' để bắt đầu.")
+                
+                # Thêm hướng dẫn troubleshooting
+                with st.expander("🔧 Hướng dẫn khắc phục lỗi kết nối"):
+                    st.markdown("""
+                    ### Các bước khắc phục:
+                    
+                    1. **Kiểm tra quyền truy cập camera:**
+                       - Đảm bảo browser có quyền truy cập camera
+                       - Kiểm tra biểu tượng camera trên thanh địa chỉ
+                       
+                    2. **Thử các cài đặt khác nhau:**
+                       - Giảm chất lượng video xuống "Thấp"
+                       - Giảm FPS xuống 10-15
+                       - Refresh trang và thử lại
+                       
+                    3. **Vấn đề mạng:**
+                       - Thử đổi sang mạng WiFi khác
+                       - Tắt VPN nếu đang sử dụng
+                       - Kiểm tra tường lửa công ty/trường học
+                       
+                    4. **Browser issues:**
+                       - Thử browser khác (Chrome, Firefox, Edge)
+                       - Clear cache và cookies
+                       - Tắt extensions có thể can thiệp
+                       
+                    5. **Nếu vẫn không được:**
+                       - Sử dụng chức năng "Tải hình ảnh" thay thế
+                       - Liên hệ IT support nếu ở môi trường công ty
+                    """)
     
     # Footer
     st.markdown("---")
     st.markdown(
         "<div style='text-align: center; color: gray;'>"
-        "🎭 Emotion Recognition App | Powered by Lê Phụng"
+        "🎭 Emotion Recognition App | Powered by Lê Phụng<br>"
+        "💡 Tip: Nếu gặp vấn đề kết nối, hãy thử giảm chất lượng video hoặc sử dụng chức năng tải ảnh"
         "</div>", 
         unsafe_allow_html=True
     )
