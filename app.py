@@ -355,20 +355,11 @@ def get_webrtc_configuration():
         
         # OpenRelay TURN servers - Free và ổn định
         {
-            "urls": "turn:openrelay.metered.ca:80",
-            "username": "openrelayproject",
-            "credential": "openrelayproject"
+            "urls": "turn:relay1.expressturn.com:3480",
+            "username": "000000002063846457",
+            "credential": "IjDTiMpkfaNqnGhlGFSRC7GMJpU="
         },
-        {
-            "urls": "turn:openrelay.metered.ca:443",
-            "username": "openrelayproject", 
-            "credential": "openrelayproject"
-        },
-        {
-            "urls": "turn:openrelay.metered.ca:443?transport=tcp",
-            "username": "openrelayproject",
-            "credential": "openrelayproject"
-        },
+      
         
         # Backup STUN servers
         {"urls": "stun:stun.stunprotocol.org:3478"},
