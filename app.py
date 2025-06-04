@@ -452,29 +452,16 @@ def main():
         layout="wide",
         initial_sidebar_state="expanded"
     )
-    def hide_streamlit_style():
-        hide_st_style =
-            <style>
-            /* Ẩn menu hamburger */
-            #MainMenu {visibility: hidden;}
-            
-            /* Ẩn header mặc định */
-            header {visibility: hidden;}
-            
-            /* Ẩn footer "Made with Streamlit" */
-            footer {visibility: hidden;}
-            
-            /* Ẩn nút Deploy (nếu có) */
-            .stDeployButton {display: none;}
-            
-            /* Ẩn toàn bộ toolbar phía trên */
-            .stAppToolbar {display: none;}
-            
-            /* Tùy chọn: Ẩn phần padding phía trên */
-            .stAppHeader {display: none;}
-            
-            
-            </style>
+    # Ẩn menu Streamlit - THÊM ĐOẠN NÀY
+    st.markdown("""
+    <style>
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+    .stDeployButton {display: none;}
+    .stAppToolbar {display: none;}
+    </style>
+    """, unsafe_allow_html=True)
         
     st.markdown(hide_st_style, unsafe_allow_html=True)
     # Header
