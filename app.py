@@ -453,7 +453,7 @@ def main():
         initial_sidebar_state="expanded"
     )
     def hide_streamlit_style():
-    hide_st_style = """
+    hide_st_style =
             <style>
             /* Ẩn menu hamburger */
             #MainMenu {visibility: hidden;}
@@ -479,7 +479,7 @@ def main():
                 padding-bottom: 0rem;
             }
             </style>
-            """
+        
     st.markdown(hide_st_style, unsafe_allow_html=True)
     # Header
     st.title("🎭 Nhận Diện Cảm Xúc Khuôn Mặt")
