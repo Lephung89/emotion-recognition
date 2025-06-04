@@ -473,10 +473,7 @@ def main():
             /* Tùy chọn: Ẩn phần padding phía trên */
             .stAppHeader {display: none;}
             
-            /* Tùy chọn: Điều chỉnh padding */
-            .main .block-container {
-                padding-top: 1rem;
-                padding-bottom: 0rem;
+            
             }
             </style>
         
