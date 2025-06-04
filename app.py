@@ -462,8 +462,7 @@ def main():
     .stAppToolbar {display: none;}
     </style>
     """, unsafe_allow_html=True)
-        
-    st.markdown(hide_st_style, unsafe_allow_html=True)
+    
     # Header
     st.title("🎭 Nhận Diện Cảm Xúc Khuôn Mặt")
     st.markdown("---")
