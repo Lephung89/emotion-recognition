@@ -452,16 +452,7 @@ def main():
         layout="wide",
         initial_sidebar_state="expanded"
     )
-    # Ẩn menu Streamlit - THÊM ĐOẠN NÀY
-    st.markdown(
-    <style>
-    #MainMenu {visibility: hidden;}
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
-    .stDeployButton {display: none;}
-    .stAppToolbar {display: none;}
-    </style>
-    , unsafe_allow_html=True)
+   
     
     # Header
     st.title("🎭 Nhận Diện Cảm Xúc Khuôn Mặt")
