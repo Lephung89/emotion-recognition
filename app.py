@@ -453,7 +453,6 @@ def main():
         initial_sidebar_state="expanded"
     )
     def hide_streamlit_style():
-    """Ẩn menu và các thành phần không cần thiết của Streamlit"""
     hide_st_style = """
             <style>
             /* Ẩn menu hamburger */
