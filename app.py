@@ -452,7 +452,36 @@ def main():
         layout="wide",
         initial_sidebar_state="expanded"
     )
-    
+    def hide_streamlit_style():
+    """Ẩn menu và các thành phần không cần thiết của Streamlit"""
+    hide_st_style = """
+            <style>
+            /* Ẩn menu hamburger */
+            #MainMenu {visibility: hidden;}
+            
+            /* Ẩn header mặc định */
+            header {visibility: hidden;}
+            
+            /* Ẩn footer "Made with Streamlit" */
+            footer {visibility: hidden;}
+            
+            /* Ẩn nút Deploy (nếu có) */
+            .stDeployButton {display: none;}
+            
+            /* Ẩn toàn bộ toolbar phía trên */
+            .stAppToolbar {display: none;}
+            
+            /* Tùy chọn: Ẩn phần padding phía trên */
+            .stAppHeader {display: none;}
+            
+            /* Tùy chọn: Điều chỉnh padding */
+            .main .block-container {
+                padding-top: 1rem;
+                padding-bottom: 0rem;
+            }
+            </style>
+            """
+    st.markdown(hide_st_style, unsafe_allow_html=True)
     # Header
     st.title("🎭 Nhận Diện Cảm Xúc Khuôn Mặt")
     st.markdown("---")
