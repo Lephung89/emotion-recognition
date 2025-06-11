@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
-MODEL_PATH = "best_modelnew.h5.keras"
+MODEL_PATH = "inception_emotion_model.keras"
 GOOGLE_DRIVE_URL = "https://drive.google.com/file/d/1okZqT58Ic9-i7J3kbZntT_ftwnK-kCyB/view?usp=drive_link"
 EMOTION_LABELS = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral']
 EMOTION_COLORS = {
